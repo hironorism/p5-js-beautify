@@ -11,9 +11,8 @@ my $preindent_string = '';
 my ($opt_indent_size, $opt_indent_char, $opt_preserve_newlines, $opt_max_preserve_newlines, $opt_jslint_happy, $opt_keep_array_indentation, $opt_space_before_conditional, $opt_indent_case);
 my $input_length;
 
-#die "no such file $ARGV[0]" unless -e $ARGV[0];
+die "no such file $ARGV[0]" unless -e $ARGV[0];
 print js_beautify( do { local $/; <> } );
-#print js_beautify( 'function hoge(a,b,c){if(a){var hoge=100}else if(b){var hoge=1000}else{ var hoge = 10000; }}' ), $/;
              
 sub js_beautify {
     my ($js_source_text, $options) = @_;
@@ -22,11 +21,11 @@ sub js_beautify {
 
     my $opt_brace_style;
 
-    if (!defined $options->{space_after_anon_function}  && !defined $options->{jslint_happy}) {
+    if (defined $options->{space_after_anon_function}  && !defined $options->{jslint_happy}) {
         $options->{jslint_happy} = $options->{space_after_anon_function};
     }
-    if (!defined $options->{braces_on_own_line}) {
-        $opt_brace_style =  $options->{braces_on_own_line} ? "epand" : "collapse";;
+    if (defined $options->{braces_on_own_line}) {
+        $opt_brace_style =  $options->{braces_on_own_line} ? "expand" : "collapse";
     }
     $opt_brace_style = $options->{brace_style} ? $options->{brace_style} 
                      : $opt_brace_style ? $opt_brace_style 
@@ -85,12 +84,12 @@ sub js_beautify {
         my $t = get_next_token($parser_pos);
         $token_text = $t->[0];
         $token_type = $t->[1];
-#warn "$token_type:$token_text";
-#warn "@output";
+
         if ($token_type eq 'TK_EOF') {
             last;
         }
 
+        SWITCH: {
         if ($token_type eq  'TK_START_EXPR') {
 
             if ($token_text eq '[') {
@@ -103,7 +102,7 @@ sub js_beautify {
                     }
                     set_mode('(EXPRESSION)');
                     print_token();
-                    next;
+                    last SWITCH;
                 }
 
                 if ($flags->{mode} eq '[EXPRESSION]' || $flags->{mode} eq '[INDENTED-EXPRESSION]') {
@@ -169,7 +168,7 @@ sub js_beautify {
             }
             print_token();
 
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_END_EXPR' ) {
             if ($token_text eq ']') {
@@ -180,7 +179,7 @@ sub js_beautify {
                         remove_indent();
                         print_token();
                         restore_mode();
-                        next;
+                        last SWITCH;
                     }
                 } else {
                     if ($flags->{mode} eq '[INDENTED-EXPRESSION]') {
@@ -188,14 +187,14 @@ sub js_beautify {
                             restore_mode();
                             print_newline();
                             print_token();
-                            next;
+                            last SWITCH;
                         }
                     }
                 }
             }
             restore_mode();
             print_token();
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_START_BLOCK') {
 
@@ -243,7 +242,7 @@ sub js_beautify {
                 indent();
                 print_token();
             }
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_END_BLOCK') {
             restore_mode();
@@ -274,7 +273,7 @@ sub js_beautify {
                 }
                 print_token();
             }
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_WORD') {
 
@@ -286,7 +285,7 @@ sub js_beautify {
                 print_token();
                 print_single_space();
                 $do_block_just_closed = 0;
-                next;
+                last SWITCH;
             }
 
             if ($token_text eq 'function') {
@@ -325,7 +324,7 @@ sub js_beautify {
                 print_token();
                 $flags->{in_case}   = 1;
                 $flags->{case_body} = 0;
-                next;
+                last SWITCH;
             }
 
             $prefix = 'NONE';
@@ -431,7 +430,7 @@ sub js_beautify {
                 $flags->{if_line} = 0;
             }
 
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_SEMICOLON') {
 
@@ -442,7 +441,7 @@ sub js_beautify {
                 # OBJECT mode is weird and doesn't get reset too well.
                 $flags->{mode} = 'BLOCK';
             }
-            next;
+            last SWITCH;
 
         }
         elsif ($token_type eq 'TK_STRING') {
@@ -455,7 +454,7 @@ sub js_beautify {
                 print_single_space();
             }
             print_token();
-            next;
+            last SWITCH;
 
         }
         elsif ($token_type eq 'TK_EQUALS') {
@@ -466,7 +465,7 @@ sub js_beautify {
             print_single_space();
             print_token();
             print_single_space();
-            next;
+            last SWITCH;
 
         }
         elsif ($token_type eq 'TK_OPERATOR') {
@@ -486,7 +485,7 @@ sub js_beautify {
                         $flags->{var_line_reindented} = 1;
                         $flags->{var_line_tainted} = 0;
                         print_newline();
-                        next;
+                        last SWITCH;
                     } else {
                         $flags->{var_line_tainted} = 0;
                     }
@@ -500,7 +499,7 @@ sub js_beautify {
                 # "return" had a special handling in TK_WORD. Now we need to return the favor
                 print_single_space();
                 print_token();
-                next;
+                last SWITCH;
             }
 
             if ($token_text eq ':' && $flags->{in_case}) {
@@ -510,13 +509,13 @@ sub js_beautify {
                 print_token(); # colon really asks for separate treatment
                 print_newline();
                 $flags->{in_case} = 0;
-                next;
+                last SWITCH;
             }
 
             if ($token_text eq '::') {
                 # no spaces around exotic namespacing syntax operator
                 print_token();
-                next;
+                last SWITCH;
             }
 
             if ($token_text eq ',') {
@@ -546,7 +545,7 @@ sub js_beautify {
                         print_single_space();
                     }
                 }
-                next;
+                last SWITCH;
             # } else if (in_array(token_text, ['--', '++', '!']) || (in_array(token_text, ['-', '+']) && (in_array(last_type, ['TK_START_BLOCK', 'TK_START_EXPR', 'TK_EQUALS']) || in_array(last_text, line_starters) || in_array(last_text, ['==', '!=', '+=', '-=', '*=', '/=', '+', '-'])))) {
             } elsif (
                 in_array($token_text, ['--', '++', '!']) || 
@@ -600,7 +599,7 @@ sub js_beautify {
                 # flags.eat_next_space = true;
             }
 
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_BLOCK_COMMENT') {
 
@@ -641,7 +640,7 @@ sub js_beautify {
             if(look_up('\n') ne '\n') {
                 print_newline();
             }
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_INLINE_COMMENT') {
             print_single_space();
@@ -651,7 +650,7 @@ sub js_beautify {
             } else {
                 force_newline();
             }
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_COMMENT') {
 
@@ -665,23 +664,23 @@ sub js_beautify {
             if(look_up('\n') ne '\n') {
                 force_newline();
             }
-            next;
+            last SWITCH;
         }
         elsif ($token_type eq 'TK_UNKNOWN') {
             if (is_special_word($last_text)) {
                 print_single_space();
             }
             print_token();
-            next;
+            last SWITCH;
         }
-
+        } # SWITCH
         $last_last_text = $last_text;
         $last_type = $token_type;
         $last_text = $token_text;
     }
 
     my $sweet_code = $preindent_string . join '', @output;
-#       $sweet_code =~ s/[\n ]+$//;
+       $sweet_code =~ s/[\n ]+$//;
     return $sweet_code;
 }
 
@@ -969,6 +968,7 @@ sub get_next_token {
 
 
     if (in_array($c, $wordchar)) {
+
         if ($parser_pos < $input_length) {
             while (in_array(substr($input, $parser_pos, 1), $wordchar)) {
                 $c .= substr($input, $parser_pos, 1);
@@ -1208,6 +1208,7 @@ sub get_next_token {
     }
 
     if (in_array($c, $punct)) {
+
         while ($parser_pos < $input_length && in_array($c . substr($input, $parser_pos, 1), $punct)) {
             $c .= substr($input, $parser_pos, 1);
             $parser_pos += 1;
